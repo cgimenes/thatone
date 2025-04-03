@@ -3,6 +3,33 @@
 
 #include "types.h"
 
+/*
+ * Zero Flag
+ * This bit is set when the result of a math operation
+ * is zero or two values match when using the CP
+ * instruction.
+ */
+#define Z_FLAG 0x80
+/*
+ * Subtract Flag
+ * This bit is set if a subtraction was performed in the
+ * last math instruction.
+ */
+#define N_FLAG 0x40
+/*
+ * Half Carry Flag
+ * This bit is set if a carry occurred from the lower
+ * nibble in the last math operation.
+ */
+#define H_FLAG 0x20
+/*
+ * Carry Flag
+ * This bit is set if a carry occurred from the las
+ * math operation or if register A is the smaller value
+ * when executing the CP instruction.
+ */
+#define C_FLAG 0x10
+
 typedef struct Registers {
   // 16-bit
   word SP; // stack pointer
@@ -59,6 +86,10 @@ typedef struct State {
 void initialize_state(State *state);
 
 void initialize_registers(State *state);
+byte get_flag(State *state, byte flag);
+void set_flag(State *state, byte flag);
+void clear_flag(State *state, byte flag);
+void clear_flags(State *state);
 
 void initialize_mmu(State *state);
 byte read_byte_from_mmu(MMU *mmu, word address);

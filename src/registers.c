@@ -20,3 +20,11 @@ void initialize_registers(State *state) {
 
   TraceLog(LOG_DEBUG, "Registers initialized");
 }
+
+byte get_flag(State *state, byte flag) { return state->registers.F & flag; }
+
+void set_flag(State *state, byte flag) { state->registers.F |= flag; }
+
+void clear_flag(State *state, byte flag) { state->registers.F &= ~flag; }
+
+void clear_flags(State *state) { state->registers.F = 0x00; }

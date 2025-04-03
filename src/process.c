@@ -89,7 +89,10 @@ void LD16(State *state, word *reg) {
 void XORn(State *state, byte *reg) {
   byte xor = state->registers.A ^ *reg;
   state->registers.A = xor;
-  state->registers.F = (xor== 0) ? 0x80 : 0x00; // Set Z flag if zero
+  clear_flags(state);
+  if (xor== 0) {
+    set_flag(state, Z_FLAG);
+  }
 }
 
 void DECw(State *state, word *reg) {
@@ -99,11 +102,11 @@ void DECw(State *state, word *reg) {
   // }
   *reg -= 1;
   if (*reg == 0) {
-    state->registers.F |= 0x80; // Set Z flag
+    set_flag(state, Z_FLAG);
   } else {
-    state->registers.F &= ~0x80; // Clear Z flag
+    clear_flag(state, Z_FLAG);
   }
-  state->registers.F |= 0x40; // Set N flag
+  set_flag(state, N_FLAG);
 }
 
 void DECb(State *state, byte *reg) {
@@ -113,11 +116,11 @@ void DECb(State *state, byte *reg) {
   // }
   *reg -= 1;
   if (*reg == 0) {
-    state->registers.F |= 0x80; // Set Z flag
+    set_flag(state, Z_FLAG);
   } else {
-    state->registers.F &= ~0x80; // Clear Z flag
+    clear_flag(state, Z_FLAG);
   }
-  state->registers.F |= 0x40; // Set N flag
+  set_flag(state, N_FLAG);
 }
 
 void LDD16n(State *state) {
@@ -127,12 +130,19 @@ void LDD16n(State *state) {
 
 void BIT(State *state, byte reg, byte bit) {
   if ((reg & (1 << bit)) == 0) {
-    state->registers.F |= 0x80; // Set Z flag
+    set_flag(state, Z_FLAG);
   } else {
-    state->registers.F &= ~0x80; // Clear Z flag
+    clear_flag(state, Z_FLAG);
   }
-  state->registers.F &= ~0x40; // Clear N flag
-  state->registers.F |= 0x20;  // Set H flag
+  clear_flag(state, N_FLAG);
+  set_flag(state, H_FLAG);
+}
+
+void JRcc(State *state, byte flag, byte condition) {
+  byte offset = fetch(state); // always fetch
+  if (get_flag(state, flag) == condition) {
+    state->registers.PC += offset;
+  }
 }
 
 void CB(State *state) {
@@ -347,10 +357,18 @@ void process(State *state) {
   case 0x3E:
     LD8(state, &state->registers.A);
     break;
-    /* case 0x20 -> JRcc(FlagKind.Z, (byte) 0x0, fetch()); */
-    /* case 0x28 -> JRcc(FlagKind.Z, (byte) 0x1, fetch()); */
-    /* case 0x30 -> JRcc(FlagKind.C, (byte) 0x0, fetch()); */
-    /* case 0x38 -> JRcc(FlagKind.C, (byte) 0x1, fetch()); */
+  case 0x20:
+    JRcc(state, Z_FLAG, 0x0);
+    break;
+  case 0x28:
+    JRcc(state, Z_FLAG, 0x1);
+    break;
+  case 0x30:
+    JRcc(state, C_FLAG, 0x0);
+    break;
+  case 0x38:
+    JRcc(state, C_FLAG, 0x1);
+    break;
   case 0x01:
     LD16(state, &state->registers.BC);
     break;
