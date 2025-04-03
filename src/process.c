@@ -1,4 +1,5 @@
 #include "process.h"
+#include "state.h"
 
 #include <raylib.h>
 #include <raymath.h>
@@ -36,39 +37,18 @@ void loadFile(const char *filename, State *state) {
   long read = fread(buffer, 1, filesize, fp);
   fclose(fp);
 
-  state->instruction_count = filesize;
-  state->instructions = buffer;
+  state->mmu.cartridge = buffer;
+  state->mmu.cartridge_size = filesize;
 
   TraceLog(LOG_DEBUG, "File loaded into memory: %ld bytes read", read);
-}
-
-void initializeRegisters(State *state) {
-  TraceLog(LOG_DEBUG, "Initializing registers");
-
-  Registers registers;
-  registers.A = 0x00;
-  registers.B = 0x00;
-  registers.D = 0x00;
-  registers.H = 0x00;
-  registers.F = 0x0000;
-  registers.C = 0x0000;
-  registers.E = 0x0000;
-  registers.L = 0x0000;
-  registers.SP = 0x0000;
-  registers.PC = 0x0000;
-
-  state->registers = registers;
-
-  TraceLog(LOG_DEBUG, "Registers initialized");
 }
 
 State init() {
   SetTraceLogLevel(LOG_DEBUG);
 
-  TraceLog(LOG_DEBUG, "Initializing state");
-
   State state;
-  initializeRegisters(&state);
+  initialize_state(&state);
+
   loadFile("dmg_boot.bin", &state);
 
   TraceLog(LOG_DEBUG, "Initializing window");
@@ -84,15 +64,7 @@ State init() {
 }
 
 byte fetch(State *state) {
-  if (state->registers.PC >= state->instruction_count) {
-    fprintf(stderr, "PC out of bounds: 0x%04X\n", state->registers.PC);
-    exit(1);
-  }
-
-  byte b = state->instructions[state->registers.PC];
-
-  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", b,
-           state->registers.PC);
+  byte b = read_byte_from_mmu(&state->mmu, state->registers.PC);
 
   state->registers.PC++;
   return b;
@@ -120,7 +92,11 @@ void XORn(State *state, byte *reg) {
   state->registers.F = (xor== 0) ? 0x80 : 0x00; // Set Z flag if zero
 }
 
-void DEC(State *state, word *reg) {
+void DECw(State *state, word *reg) {
+  // TODO
+  // if ((register.get() & 0x0f) == 0x0f) {
+  //     registers.Flags.set(FlagKind.H);
+  // }
   *reg -= 1;
   if (*reg == 0) {
     state->registers.F |= 0x80; // Set Z flag
@@ -130,12 +106,226 @@ void DEC(State *state, word *reg) {
   state->registers.F |= 0x40; // Set N flag
 }
 
+void DECb(State *state, byte *reg) {
+  // TODO
+  // if ((register.get() & 0x0f) == 0x0f) {
+  //     registers.Flags.set(FlagKind.H);
+  // }
+  *reg -= 1;
+  if (*reg == 0) {
+    state->registers.F |= 0x80; // Set Z flag
+  } else {
+    state->registers.F &= ~0x80; // Clear Z flag
+  }
+  state->registers.F |= 0x40; // Set N flag
+}
+
+void LDD16n(State *state) {
+  write_byte_to_mmu(&state->mmu, state->registers.HL, state->registers.A);
+  DECw(state, &state->registers.HL);
+}
+
+void BIT(State *state, byte reg, byte bit) {
+  if ((reg & (1 << bit)) == 0) {
+    state->registers.F |= 0x80; // Set Z flag
+  } else {
+    state->registers.F &= ~0x80; // Clear Z flag
+  }
+  state->registers.F &= ~0x40; // Clear N flag
+  state->registers.F |= 0x20;  // Set H flag
+}
+
+void CB(State *state) {
+  byte op = fetch(state);
+
+  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
+           state->registers.PC - 1);
+
+  switch (op) {
+  case 0x40:
+    BIT(state, state->registers.B, 0x0);
+    break;
+  case 0x41:
+    BIT(state, state->registers.C, 0x0);
+    break;
+  case 0x42:
+    BIT(state, state->registers.D, 0x0);
+    break;
+  case 0x43:
+    BIT(state, state->registers.E, 0x0);
+    break;
+  case 0x44:
+    BIT(state, state->registers.H, 0x0);
+    break;
+  case 0x45:
+    BIT(state, state->registers.L, 0x0);
+    break;
+  case 0x47:
+    BIT(state, state->registers.A, 0x0);
+    break;
+  case 0x48:
+    BIT(state, state->registers.B, 0x1);
+    break;
+  case 0x49:
+    BIT(state, state->registers.C, 0x1);
+    break;
+  case 0x4A:
+    BIT(state, state->registers.D, 0x1);
+    break;
+  case 0x4B:
+    BIT(state, state->registers.E, 0x1);
+    break;
+  case 0x4C:
+    BIT(state, state->registers.H, 0x1);
+    break;
+  case 0x4D:
+    BIT(state, state->registers.L, 0x1);
+    break;
+  case 0x4F:
+    BIT(state, state->registers.A, 0x1);
+    break;
+  case 0x50:
+    BIT(state, state->registers.B, 0x2);
+    break;
+  case 0x51:
+    BIT(state, state->registers.C, 0x2);
+    break;
+  case 0x52:
+    BIT(state, state->registers.D, 0x2);
+    break;
+  case 0x53:
+    BIT(state, state->registers.E, 0x2);
+    break;
+  case 0x54:
+    BIT(state, state->registers.H, 0x2);
+    break;
+  case 0x55:
+    BIT(state, state->registers.L, 0x2);
+    break;
+  case 0x57:
+    BIT(state, state->registers.A, 0x2);
+    break;
+  case 0x58:
+    BIT(state, state->registers.B, 0x3);
+    break;
+  case 0x59:
+    BIT(state, state->registers.C, 0x3);
+    break;
+  case 0x5A:
+    BIT(state, state->registers.D, 0x3);
+    break;
+  case 0x5B:
+    BIT(state, state->registers.E, 0x3);
+    break;
+  case 0x5C:
+    BIT(state, state->registers.H, 0x3);
+    break;
+  case 0x5D:
+    BIT(state, state->registers.L, 0x3);
+    break;
+  case 0x5F:
+    BIT(state, state->registers.A, 0x3);
+    break;
+  case 0x60:
+    BIT(state, state->registers.B, 0x4);
+    break;
+  case 0x61:
+    BIT(state, state->registers.C, 0x4);
+    break;
+  case 0x62:
+    BIT(state, state->registers.D, 0x4);
+    break;
+  case 0x63:
+    BIT(state, state->registers.E, 0x4);
+    break;
+  case 0x64:
+    BIT(state, state->registers.H, 0x4);
+    break;
+  case 0x65:
+    BIT(state, state->registers.L, 0x4);
+    break;
+  case 0x67:
+    BIT(state, state->registers.A, 0x4);
+    break;
+  case 0x68:
+    BIT(state, state->registers.B, 0x5);
+    break;
+  case 0x69:
+    BIT(state, state->registers.C, 0x5);
+    break;
+  case 0x6A:
+    BIT(state, state->registers.D, 0x5);
+    break;
+  case 0x6B:
+    BIT(state, state->registers.E, 0x5);
+    break;
+  case 0x6C:
+    BIT(state, state->registers.H, 0x5);
+    break;
+  case 0x6D:
+    BIT(state, state->registers.L, 0x5);
+    break;
+  case 0x6F:
+    BIT(state, state->registers.A, 0x5);
+    break;
+  case 0x70:
+    BIT(state, state->registers.B, 0x6);
+    break;
+  case 0x71:
+    BIT(state, state->registers.C, 0x6);
+    break;
+  case 0x72:
+    BIT(state, state->registers.D, 0x6);
+    break;
+  case 0x73:
+    BIT(state, state->registers.E, 0x6);
+    break;
+  case 0x74:
+    BIT(state, state->registers.H, 0x6);
+    break;
+  case 0x75:
+    BIT(state, state->registers.L, 0x6);
+    break;
+  case 0x77:
+    BIT(state, state->registers.A, 0x6);
+    break;
+  case 0x78:
+    BIT(state, state->registers.B, 0x7);
+    break;
+  case 0x79:
+    BIT(state, state->registers.C, 0x7);
+    break;
+  case 0x7A:
+    BIT(state, state->registers.D, 0x7);
+    break;
+  case 0x7B:
+    BIT(state, state->registers.E, 0x7);
+    break;
+  case 0x7C:
+    BIT(state, state->registers.H, 0x7);
+    break;
+  case 0x7D:
+    BIT(state, state->registers.L, 0x7);
+    break;
+  case 0x7F:
+    BIT(state, state->registers.A, 0x7);
+    break;
+  default:
+    TraceLog(LOG_ERROR, "Unknown opcode: 0x%02X - PC: 0x%04X", op,
+             state->registers.PC - 1);
+    exit(1);
+  }
+}
+
 void process(State *state) {
   // Fetch the next opcode.
-  byte b = fetch(state);
+  byte op = fetch(state);
+
+  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
+           state->registers.PC - 1);
 
   // Decode the fetched opcode.
-  switch (b) {
+  switch (op) {
   case 0x06:
     LD8(state, &state->registers.B);
     break;
@@ -173,15 +363,27 @@ void process(State *state) {
   case 0x31:
     LD16(state, &state->registers.SP);
     break;
-  /* case 0x32 -> LDD16n(); */
+  case 0x32:
+    LDD16n(state);
+    break;
   /* case 0x4F -> LDnA(registers.C); */
   /* case 0x77 -> LDnA(registers.HL); */
   /* case 0x1A -> LDAn(registers.DE); */
-  /* case 0x05 -> DEC(registers.B); */
-  /* case 0x0B -> DEC(registers.BC); */
-  /* case 0x1B -> DEC(registers.DE); */
-  /* case 0x2B -> DEC(registers.HL); */
-  /* case 0x3B -> DEC(registers.SP); */
+  case 0x05:
+    DECb(state, &state->registers.B);
+    break;
+  case 0x0B:
+    DECw(state, &state->registers.BC);
+    break;
+  case 0x1B:
+    DECw(state, &state->registers.DE);
+    break;
+  case 0x2B:
+    DECw(state, &state->registers.HL);
+    break;
+  case 0x3B:
+    DECw(state, &state->registers.SP);
+    break;
   /* case 0x0C -> INC(registers.C); */
   /* case 0x17 -> RLA(); */
   /* case (byte) 0xC1 -> POP(registers.BC); */
@@ -208,11 +410,13 @@ void process(State *state) {
   case 0xAF:
     XORn(state, &state->registers.A);
     break;
-  /* case (byte) 0xCB -> CB(); */
+  case 0xCB:
+    CB(state);
+    break;
   /* case (byte) 0xE0 -> LDHnA(); */
   /* case (byte) 0xE2 -> LDcA(); */
   default:
-    TraceLog(LOG_ERROR, "Unknown opcode: 0x%02X - PC: 0x%04X", b,
+    TraceLog(LOG_ERROR, "Unknown opcode: 0x%02X - PC: 0x%04X", op,
              state->registers.PC - 1);
     exit(1);
   }

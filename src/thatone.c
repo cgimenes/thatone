@@ -47,7 +47,8 @@ bool reload_lib() {
 }
 
 bool hot_reload() {
-  time_t current_libprocess_file_mod_time = GetFileModTime(libprocess_file_path);
+  time_t current_libprocess_file_mod_time =
+      GetFileModTime(libprocess_file_path);
   if (current_libprocess_file_mod_time != libprocess_file_mod_time) {
     // mod time is changed quicker than the compilation, so we have an empty
     // file for an while. I may change it for a "trigger file" in the future.
