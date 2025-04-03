@@ -54,6 +54,7 @@ bool hot_reload() {
     // file for an while. I may change it for a "trigger file" in the future.
     // Creating a specific file after compilation finishes and checking its mod
     // time here
+    TraceLog(LOG_INFO, "Reloading libprocess");
     sleep(1);
     return reload_lib();
   }
