@@ -330,7 +330,7 @@ void CB(State *state) {
 }
 
 void process(State *state) {
-  if (IsKeyPressed(KEY_SPACE)) {
+  if (IsKeyPressed(KEY_N)) {
     next = 1;
   }
   if (IsKeyPressed(KEY_R)) {
@@ -451,7 +451,7 @@ void process(State *state) {
                state->registers.PC - 1);
       /* exit(1); */
     }
-    next = 0;
+    /* next = 0; */
   }
 
   // draw
@@ -459,23 +459,23 @@ void process(State *state) {
   {
     ClearBackground(BLACK);
 
-    DrawText(TextFormat("A: 0x%02X", state->registers.A), 10, 10, 20, WHITE);
-    DrawText(TextFormat("B: 0x%02X", state->registers.B), 10, 30, 20, WHITE);
-    DrawText(TextFormat("C: 0x%02X", state->registers.C), 10, 50, 20, WHITE);
-    DrawText(TextFormat("D: 0x%02X", state->registers.D), 10, 70, 20, WHITE);
-    DrawText(TextFormat("E: 0x%02X", state->registers.E), 10, 90, 20, WHITE);
+    DrawText(TextFormat("A: 0x%02hhX", state->registers.A), 10, 10, 20, WHITE);
+    DrawText(TextFormat("B: 0x%02hhX", state->registers.B), 10, 30, 20, WHITE);
+    DrawText(TextFormat("C: 0x%02hhX", state->registers.C), 10, 50, 20, WHITE);
+    DrawText(TextFormat("D: 0x%02hhX", state->registers.D), 10, 70, 20, WHITE);
+    DrawText(TextFormat("E: 0x%02hhX", state->registers.E), 10, 90, 20, WHITE);
     DrawText(TextFormat("F: b" BYTE_TO_BINARY_PATTERN,
                         BYTE_TO_BINARY(state->registers.F)),
              10, 110, 20, WHITE);
-    DrawText(TextFormat("H: 0x%02X", state->registers.H), 10, 130, 20, WHITE);
-    DrawText(TextFormat("L: 0x%02X", state->registers.L), 10, 150, 20, WHITE);
-    DrawText(TextFormat("AF: 0x%04X", state->registers.AF), 10, 170, 20, WHITE);
-    DrawText(TextFormat("BC: 0x%04X", state->registers.BC), 10, 190, 20, WHITE);
-    DrawText(TextFormat("DE: 0x%04X", state->registers.DE), 10, 210, 20, WHITE);
-    DrawText(TextFormat("HL: 0x%04X", state->registers.HL), 10, 230, 20, WHITE);
-    DrawText(TextFormat("SP: 0x%04X", state->registers.SP), 10, 250, 20, WHITE);
-    DrawText(TextFormat("PC: 0x%04X", state->registers.PC), 10, 270, 20, WHITE);
-    DrawText(TextFormat("OP: 0x%02X",
+    DrawText(TextFormat("H: 0x%02hhX", state->registers.H), 10, 130, 20, WHITE);
+    DrawText(TextFormat("L: 0x%02hhX", state->registers.L), 10, 150, 20, WHITE);
+    DrawText(TextFormat("AF: 0x%04hhX", state->registers.AF), 10, 170, 20, WHITE);
+    DrawText(TextFormat("BC: 0x%04hhX", state->registers.BC), 10, 190, 20, WHITE);
+    DrawText(TextFormat("DE: 0x%04hhX", state->registers.DE), 10, 210, 20, WHITE);
+    DrawText(TextFormat("HL: 0x%04hhX", state->registers.HL), 10, 230, 20, WHITE);
+    DrawText(TextFormat("SP: 0x%04hhX", state->registers.SP), 10, 250, 20, WHITE);
+    DrawText(TextFormat("PC: 0x%04hhX", state->registers.PC), 10, 270, 20, WHITE);
+    DrawText(TextFormat("OP: 0x%02hhX",
                         read_byte_from_mmu(&state->mmu, state->registers.PC)),
              10, 290, 20, WHITE);
   }
