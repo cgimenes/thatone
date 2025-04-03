@@ -4,10 +4,10 @@ CFLAGS=-Wall -Wextra -ggdb
 
 build: build/thatone
 
-build/thatone: src/thatone.c build/librender.so
+build/thatone: src/thatone.c build/libprocess.so
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS) -ldl
 
-build/librender.so: src/render.c src/render.h
+build/libprocess.so: src/process.c src/process.h
 	-mkdir build
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS) -fPIC -shared
 

@@ -8,47 +8,47 @@
 
 #include <dlfcn.h>
 
-#include "render.h"
+#include "process.h"
 
 init_t init = NULL;
-render_t render = NULL;
-const char *librender_file_name = "librender.so";
-const char *librender_file_path = "build/librender.so";
-time_t librender_file_mod_time = 0;
-void *librender = NULL;
+process_t process = NULL;
+const char *libprocess_file_name = "libprocess.so";
+const char *libprocess_file_path = "build/libprocess.so";
+time_t libprocess_file_mod_time = 0;
+void *libprocess = NULL;
 
 bool reload_lib() {
-  if (librender != NULL)
-    dlclose(librender);
+  if (libprocess != NULL)
+    dlclose(libprocess);
 
-  librender = dlopen(librender_file_name, RTLD_NOW);
-  if (librender == NULL) {
-    fprintf(stderr, "ERROR: could not load %s: %s", librender_file_name,
+  libprocess = dlopen(libprocess_file_name, RTLD_NOW);
+  if (libprocess == NULL) {
+    fprintf(stderr, "ERROR: could not load %s: %s", libprocess_file_name,
             dlerror());
     return false;
   }
 
-  init = dlsym(librender, "init");
+  init = dlsym(libprocess, "init");
   if (init == NULL) {
     fprintf(stderr, "ERROR: could not find init symbol in %s: %s",
-            librender_file_name, dlerror());
+            libprocess_file_name, dlerror());
     return 1;
   }
 
-  render = dlsym(librender, "render");
-  if (render == NULL) {
-    fprintf(stderr, "ERROR: could not find render symbol in %s: %s",
-            librender_file_name, dlerror());
+  process = dlsym(libprocess, "process");
+  if (process == NULL) {
+    fprintf(stderr, "ERROR: could not find process symbol in %s: %s",
+            libprocess_file_name, dlerror());
     return false;
   }
-  librender_file_mod_time = GetFileModTime(librender_file_path);
+  libprocess_file_mod_time = GetFileModTime(libprocess_file_path);
 
   return true;
 }
 
 bool hot_reload() {
-  time_t current_librender_file_mod_time = GetFileModTime(librender_file_path);
-  if (current_librender_file_mod_time != librender_file_mod_time) {
+  time_t current_libprocess_file_mod_time = GetFileModTime(libprocess_file_path);
+  if (current_libprocess_file_mod_time != libprocess_file_mod_time) {
     // mod time is changed quicker than the compilation, so we have an empty
     // file for an while. I may change it for a "trigger file" in the future.
     // Creating a specific file after compilation finishes and checking its mod
@@ -69,7 +69,7 @@ int main() {
     if (!hot_reload())
       return 1;
 
-    render(&state);
+    process(&state);
   }
 
   CloseWindow();
