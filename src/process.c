@@ -9,7 +9,7 @@
 
 void loadFile(const char *filename, State *state) {
   FILE *fp;
-  long size;
+  long filesize;
   byte *buffer;
 
   TraceLog(LOG_DEBUG, "Opening file: %s", filename);
@@ -21,24 +21,25 @@ void loadFile(const char *filename, State *state) {
   TraceLog(LOG_DEBUG, "File opened");
 
   fseek(fp, 0, SEEK_END);
-  size = ftell(fp);
+  filesize = ftell(fp);
 
-  TraceLog(LOG_DEBUG, "File size: %ld", size);
+  TraceLog(LOG_DEBUG, "File size: %ld bytes", filesize);
 
   TraceLog(LOG_DEBUG, "Allocating memory");
-  if (!(buffer = malloc(size * sizeof(byte)))) {
+  if (!(buffer = malloc(filesize))) {
     fprintf(stderr, "Failed to allocate memory\n");
     exit(1);
   }
 
   TraceLog(LOG_DEBUG, "Reading file into memory");
-  fread(buffer, size, 1, fp);
+  rewind(fp);
+  long read = fread(buffer, 1, filesize, fp);
   fclose(fp);
 
-  state->instruction_count = size;
+  state->instruction_count = filesize;
   state->instructions = buffer;
 
-  TraceLog(LOG_DEBUG, "File loaded into memory");
+  TraceLog(LOG_DEBUG, "File loaded into memory: %ld bytes read", read);
 }
 
 void initializeRegisters(State *state) {
