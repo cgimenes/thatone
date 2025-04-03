@@ -6,6 +6,8 @@
 
 typedef struct State {
   Registers registers;
+  byte *instructions;
+  long instruction_count;
 } State;
 
 typedef void (*process_t)(State *state);
