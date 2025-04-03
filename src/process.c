@@ -120,6 +120,16 @@ void XORn(State *state, byte *reg) {
   state->registers.F = (xor== 0) ? 0x80 : 0x00; // Set Z flag if zero
 }
 
+void DEC(State *state, word *reg) {
+  *reg -= 1;
+  if (*reg == 0) {
+    state->registers.F |= 0x80; // Set Z flag
+  } else {
+    state->registers.F &= ~0x80; // Clear Z flag
+  }
+  state->registers.F |= 0x40; // Set N flag
+}
+
 void process(State *state) {
   // Fetch the next opcode.
   byte b = fetch(state);
