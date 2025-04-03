@@ -63,28 +63,22 @@ State init() {
   return state;
 }
 
-byte fetch(State *state) {
+byte fetch_byte(State *state) {
   byte b = read_byte_from_mmu(&state->mmu, state->registers.PC);
 
   state->registers.PC++;
   return b;
 }
 
-word fetch16(State *state) {
-  byte low = fetch(state);
-  byte high = fetch(state);
+word fetch_word(State *state) {
+  byte low = fetch_byte(state);
+  byte high = fetch_byte(state);
   return (high << 8) | low;
 }
 
-void LD8(State *state, byte *reg) {
-  byte value = fetch(state);
-  *reg = value;
-}
+void LDb(byte *reg, byte value) { *reg = value; }
 
-void LD16(State *state, word *reg) {
-  word value = fetch16(state);
-  *reg = value;
-}
+void LDw(word *reg, word value) { *reg = value; }
 
 void XORn(State *state, byte *reg) {
   byte xor = state->registers.A ^ *reg;
@@ -123,7 +117,7 @@ void DECb(State *state, byte *reg) {
   set_flag(state, N_FLAG);
 }
 
-void LDD16n(State *state) {
+void LDDwn(State *state) {
   write_byte_to_mmu(&state->mmu, state->registers.HL, state->registers.A);
   DECw(state, &state->registers.HL);
 }
@@ -138,15 +132,14 @@ void BIT(State *state, byte reg, byte bit) {
   set_flag(state, H_FLAG);
 }
 
-void JRcc(State *state, byte flag, byte condition) {
-  byte offset = fetch(state); // always fetch
+void JRcc(State *state, byte flag, byte condition, byte offset) {
   if (get_flag(state, flag) == condition) {
     state->registers.PC += offset;
   }
 }
 
 void CB(State *state) {
-  byte op = fetch(state);
+  byte op = fetch_byte(state);
 
   TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
            state->registers.PC - 1);
@@ -329,7 +322,7 @@ void CB(State *state) {
 
 void process(State *state) {
   // Fetch the next opcode.
-  byte op = fetch(state);
+  byte op = fetch_byte(state);
 
   TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
            state->registers.PC - 1);
@@ -337,52 +330,52 @@ void process(State *state) {
   // Decode the fetched opcode.
   switch (op) {
   case 0x06:
-    LD8(state, &state->registers.B);
+    LDb(&state->registers.B, fetch_byte(state));
     break;
   case 0x0E:
-    LD8(state, &state->registers.C);
+    LDb(&state->registers.C, fetch_byte(state));
     break;
   case 0x16:
-    LD8(state, &state->registers.D);
+    LDb(&state->registers.D, fetch_byte(state));
     break;
   case 0x1E:
-    LD8(state, &state->registers.E);
+    LDb(&state->registers.E, fetch_byte(state));
     break;
   case 0x26:
-    LD8(state, &state->registers.H);
+    LDb(&state->registers.H, fetch_byte(state));
     break;
   case 0x2E:
-    LD8(state, &state->registers.L);
+    LDb(&state->registers.L, fetch_byte(state));
     break;
   case 0x3E:
-    LD8(state, &state->registers.A);
+    LDb(&state->registers.A, fetch_byte(state));
     break;
   case 0x20:
-    JRcc(state, Z_FLAG, 0x0);
+    JRcc(state, Z_FLAG, 0x0, fetch_byte(state));
     break;
   case 0x28:
-    JRcc(state, Z_FLAG, 0x1);
+    JRcc(state, Z_FLAG, 0x1, fetch_byte(state));
     break;
   case 0x30:
-    JRcc(state, C_FLAG, 0x0);
+    JRcc(state, C_FLAG, 0x0, fetch_byte(state));
     break;
   case 0x38:
-    JRcc(state, C_FLAG, 0x1);
+    JRcc(state, C_FLAG, 0x1, fetch_byte(state));
     break;
   case 0x01:
-    LD16(state, &state->registers.BC);
+    LDw(&state->registers.BC, fetch_word(state));
     break;
   case 0x11:
-    LD16(state, &state->registers.DE);
+    LDw(&state->registers.DE, fetch_word(state));
     break;
   case 0x21:
-    LD16(state, &state->registers.HL);
+    LDw(&state->registers.HL, fetch_word(state));
     break;
   case 0x31:
-    LD16(state, &state->registers.SP);
+    LDw(&state->registers.SP, fetch_word(state));
     break;
   case 0x32:
-    LDD16n(state);
+    LDDwn(state);
     break;
   /* case 0x4F -> LDnA(registers.C); */
   /* case 0x77 -> LDnA(registers.HL); */
