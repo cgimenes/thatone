@@ -99,7 +99,7 @@ void XORn(State *state, byte reg) {
   }
 }
 
-void DECw(State *state, word *reg) {
+void DECw(word *reg) {
   // TODO
   // if ((register.get() & 0x0f) == 0x0f) {
   //     registers.Flags.set(FlagKind.H);
@@ -127,6 +127,12 @@ void DECb(State *state, byte *reg) {
   set_flag(state, N_FLAG);
 }
 
+void CALL(State *state, word address, byte value) {
+  DECw(&state->registers.SP);
+  write_byte_to_mmu(&state->mmu, state->registers.SP, value);
+  state->registers.PC = address;
+}
+
 void LDnA(State *state, word address) {
   write_byte_to_mmu(&state->mmu, address, state->registers.A);
 }
@@ -147,10 +153,32 @@ void JRcc(State *state, byte flag, byte condition, byte offset) {
   }
 }
 
+void LDcA(State *state) {
+  write_word_to_mmu(&state->mmu, 0xff00 + state->registers.C,
+                    state->registers.A);
+}
+
+void INC(State *state, byte *reg) {
+  // Set if carry from bit 3
+  if ((*reg & 0x0f) == 0x0f) {
+    set_flag(state, H_FLAG);
+  }
+  // TODO não entendi essa regra de "& 0xff"?
+  *reg = (*reg + 0x1) & 0xff;
+  if (*reg == 0x0) {
+    set_flag(state, Z_FLAG);
+  }
+  clear_flag(state, N_FLAG);
+}
+
+void LDHnA(State *state, byte value) {
+  write_word_to_mmu(&state->mmu, 0xff00 + value, state->registers.A);
+}
+
 void CB(State *state) {
   byte op = fetch_byte(state);
 
-  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
+  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02hhX - PC: 0x%04hhX", op,
            state->registers.PC - 1);
 
   switch (op) {
@@ -323,7 +351,7 @@ void CB(State *state) {
     BIT(state, state->registers.A, 7);
     break;
   default:
-    TraceLog(LOG_ERROR, "Unknown opcode: 0x%02X - PC: 0x%04X", op,
+    TraceLog(LOG_ERROR, "Unknown CB opcode: 0x%02hhX - PC: 0x%04hhX", op,
              state->registers.PC - 1);
     exit(1);
   }
@@ -341,7 +369,7 @@ void process(State *state) {
     // Fetch the next opcode.
     byte op = fetch_byte(state);
 
-    TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02X - PC: 0x%04X", op,
+    TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02hhX - PC: 0x%04hhX", op,
              state->registers.PC - 1);
 
     // Decode the fetched opcode.
@@ -393,10 +421,14 @@ void process(State *state) {
       break;
     case 0x32:
       LDnA(state, state->registers.HL);
-      DECw(state, &state->registers.HL);
+      DECw(&state->registers.HL);
       break;
-    /* case 0x1A -> LDAn(registers.DE); */
-    /* case 0x4F -> LDnA(registers.C); */
+    case 0x1A:
+      LDnA(state, state->registers.DE);
+      break;
+    case 0x4F:
+      LDnA(state, state->registers.C);
+      break;
     case 0x77:
       LDnA(state, state->registers.HL);
       break;
@@ -404,54 +436,61 @@ void process(State *state) {
       DECb(state, &state->registers.B);
       break;
     case 0x0B:
-      DECw(state, &state->registers.BC);
+      DECw(&state->registers.BC);
       break;
     case 0x1B:
-      DECw(state, &state->registers.DE);
+      DECw(&state->registers.DE);
       break;
     case 0x2B:
-      DECw(state, &state->registers.HL);
+      DECw(&state->registers.HL);
       break;
     case 0x3B:
-      DECw(state, &state->registers.SP);
+      DECw(&state->registers.SP);
       break;
-    /* case 0x0C -> INC(registers.C); */
-    /* case 0x17 -> RLA(); */
-    /* case (byte) 0xC1 -> POP(registers.BC); */
-    /* case (byte) 0xC5 -> PUSH(registers.BC); */
-    /* case (byte) 0xCD -> CALL(); */
-    case 0xA8:
+    case 0x0C:
+      INC(state, &state->registers.C);
+      break;
+      /* case 0x17 -> RLA(); */
+      /* case (byte) 0xC1 -> POP(registers.BC); */
+      /* case (byte) 0xC5 -> PUSH(registers.BC); */
+    case (byte)0xCD:
+      CALL(state, fetch_word(state), fetch_byte(state));
+      break;
+    case (byte)0xA8:
       XORn(state, state->registers.B);
       break;
-    case 0xA9:
+    case (byte)0xA9:
       XORn(state, state->registers.C);
       break;
-    case 0xAA:
+    case (byte)0xAA:
       XORn(state, state->registers.D);
       break;
-    case 0xAB:
+    case (byte)0xAB:
       XORn(state, state->registers.E);
       break;
-    case 0xAC:
+    case (byte)0xAC:
       XORn(state, state->registers.H);
       break;
-    case 0xAD:
+    case (byte)0xAD:
       XORn(state, state->registers.L);
       break;
-    case 0xAF:
+    case (byte)0xAF:
       XORn(state, state->registers.A);
       break;
-    case 0xCB:
+    case (byte)0xCB:
       CB(state);
       break;
-    /* case (byte) 0xE0 -> LDHnA(); */
-    /* case (byte) 0xE2 -> LDcA(); */
+    case (byte)0xE0:
+      LDHnA(state, fetch_byte(state));
+      break;
+    case (byte)0xE2:
+      LDcA(state);
+      break;
     default:
-      TraceLog(LOG_ERROR, "Unknown opcode: 0x%02X - PC: 0x%04X", op,
+      TraceLog(LOG_ERROR, "Unknown opcode: 0x%02hhX - PC: 0x%04hhX", op,
                state->registers.PC - 1);
-      /* exit(1); */
+      next = 0;
     }
-    /* next = 0; */
   }
 
   // draw
@@ -469,15 +508,21 @@ void process(State *state) {
              10, 110, 20, WHITE);
     DrawText(TextFormat("H: 0x%02hhX", state->registers.H), 10, 130, 20, WHITE);
     DrawText(TextFormat("L: 0x%02hhX", state->registers.L), 10, 150, 20, WHITE);
-    DrawText(TextFormat("AF: 0x%04hhX", state->registers.AF), 10, 170, 20, WHITE);
-    DrawText(TextFormat("BC: 0x%04hhX", state->registers.BC), 10, 190, 20, WHITE);
-    DrawText(TextFormat("DE: 0x%04hhX", state->registers.DE), 10, 210, 20, WHITE);
-    DrawText(TextFormat("HL: 0x%04hhX", state->registers.HL), 10, 230, 20, WHITE);
-    DrawText(TextFormat("SP: 0x%04hhX", state->registers.SP), 10, 250, 20, WHITE);
-    DrawText(TextFormat("PC: 0x%04hhX", state->registers.PC), 10, 270, 20, WHITE);
+    DrawText(TextFormat("AF: 0x%04hhX", state->registers.AF), 10, 170, 20,
+             WHITE);
+    DrawText(TextFormat("BC: 0x%04hhX", state->registers.BC), 10, 190, 20,
+             WHITE);
+    DrawText(TextFormat("DE: 0x%04hhX", state->registers.DE), 10, 210, 20,
+             WHITE);
+    DrawText(TextFormat("HL: 0x%04hhX", state->registers.HL), 10, 230, 20,
+             WHITE);
+    DrawText(TextFormat("SP: 0x%04hhX", state->registers.SP), 10, 250, 20,
+             WHITE);
+    DrawText(TextFormat("PC: 0x%04hhX", state->registers.PC), 10, 270, 20,
+             WHITE);
     DrawText(TextFormat("OP: 0x%02hhX",
                         read_byte_from_mmu(&state->mmu, state->registers.PC)),
-             10, 290, 20, WHITE);
+             10, 290, 20, YELLOW);
   }
   EndDrawing();
 }

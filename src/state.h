@@ -67,5 +67,6 @@ void clear_flags(State *state);
 void initialize_mmu(State *state);
 byte read_byte_from_mmu(MMU *mmu, word address);
 void write_byte_to_mmu(MMU *mmu, word address, byte value);
+void write_word_to_mmu(MMU *mmu, word address, word value);
 
 #endif // STATE_H_

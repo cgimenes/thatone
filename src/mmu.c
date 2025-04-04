@@ -59,3 +59,8 @@ void write_byte_to_mmu(MMU *mmu, word address, byte value) {
     mmu->internalRam[address - 0xFF80] = value;
   }
 }
+
+void write_word_to_mmu(MMU *mmu, word address, word value) {
+  write_byte_to_mmu(mmu, address, value & 0xFF);
+  write_byte_to_mmu(mmu, address + 1, (value >> 8) & 0xFF);
+}
