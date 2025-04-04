@@ -9,14 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BINARY(byte)                                                   \
-  ((byte) & 0x80 ? '1' : '0'), ((byte) & 0x40 ? '1' : '0'),                    \
-      ((byte) & 0x20 ? '1' : '0'), ((byte) & 0x10 ? '1' : '0'),                \
-      ((byte) & 0x08 ? '1' : '0'), ((byte) & 0x04 ? '1' : '0'),                \
-      ((byte) & 0x02 ? '1' : '0'), ((byte) & 0x01 ? '1' : '0')
-
 int next = 0;
+int cont = 0;
 
 void loadFile(const char *filename, State *state) {
   FILE *fp;
@@ -66,7 +60,6 @@ State init() {
   int screenWidth = 800;
   int screenHeight = 800;
   InitWindow(screenWidth, screenHeight, "ThatOne");
-  SetTargetFPS(60);
 
   TraceLog(LOG_DEBUG, "Window initialized");
 
@@ -83,7 +76,8 @@ byte fetch_byte(State *state) {
 word fetch_word(State *state) {
   byte low = fetch_byte(state);
   byte high = fetch_byte(state);
-  return (high << 8) | low;
+  return ((unsigned short)(unsigned char)high << 8) |
+         (unsigned short)(unsigned char)low;
 }
 
 void LDb(byte *reg, byte value) { *reg = value; }
@@ -127,9 +121,20 @@ void DECb(State *state, byte *reg) {
   set_flag(state, N_FLAG);
 }
 
-void CALL(State *state, word address, byte value) {
+void PUSHb(State *state, byte data) {
   DECw(&state->registers.SP);
-  write_byte_to_mmu(&state->mmu, state->registers.SP, value);
+  write_byte_to_mmu(&state->mmu, state->registers.SP, data);
+}
+
+void PUSHw(State *state, word data) {
+  DECw(&state->registers.SP);
+  write_byte_to_mmu(&state->mmu, state->registers.SP, data & 0x00FF);
+  DECw(&state->registers.SP);
+  write_byte_to_mmu(&state->mmu, state->registers.SP, (data >> 8) & 0x00FF);
+}
+
+void CALL(State *state, word address, byte value) {
+  PUSHb(state, value);
   state->registers.PC = address;
 }
 
@@ -177,9 +182,6 @@ void LDHnA(State *state, byte value) {
 
 void CB(State *state) {
   byte op = fetch_byte(state);
-
-  TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02hhX - PC: 0x%04hhX", op,
-           state->registers.PC - 1);
 
   switch (op) {
   case 0x40:
@@ -351,26 +353,28 @@ void CB(State *state) {
     BIT(state, state->registers.A, 7);
     break;
   default:
-    TraceLog(LOG_ERROR, "Unknown CB opcode: 0x%02hhX - PC: 0x%04hhX", op,
+    TraceLog(LOG_ERROR, "Unknown CB opcode: 0x%02hhX - PC: 0x%04hX", op,
              state->registers.PC - 1);
     exit(1);
   }
 }
 
 void process(State *state) {
+  if (IsKeyPressed(KEY_C)) {
+    cont = 1;
+  }
   if (IsKeyPressed(KEY_N)) {
     next = 1;
   }
   if (IsKeyPressed(KEY_R)) {
+    cont = 0;
+    next = 0;
     initialize_state(state);
     TraceLog(LOG_DEBUG, "State reinitialized");
   }
-  if (next) {
+  if (next || cont) {
     // Fetch the next opcode.
     byte op = fetch_byte(state);
-
-    TraceLog(LOG_DEBUG, "Fetched opcode: 0x%02hhX - PC: 0x%04hhX", op,
-             state->registers.PC - 1);
 
     // Decode the fetched opcode.
     switch (op) {
@@ -450,11 +454,13 @@ void process(State *state) {
     case 0x0C:
       INC(state, &state->registers.C);
       break;
-      /* case 0x17 -> RLA(); */
-      /* case (byte) 0xC1 -> POP(registers.BC); */
-      /* case (byte) 0xC5 -> PUSH(registers.BC); */
+    /* case 0x17 -> RLA(); */
+    /* case (byte) 0xC1 -> POP(registers.BC); */
+    case (byte)0xC5:
+      PUSHw(state, state->registers.BC);
+      break;
     case (byte)0xCD:
-      CALL(state, fetch_word(state), fetch_byte(state));
+      CALL(state, fetch_word(state), state->registers.PC + 2);
       break;
     case (byte)0xA8:
       XORn(state, state->registers.B);
@@ -487,10 +493,11 @@ void process(State *state) {
       LDcA(state);
       break;
     default:
-      TraceLog(LOG_ERROR, "Unknown opcode: 0x%02hhX - PC: 0x%04hhX", op,
+      TraceLog(LOG_ERROR, "Unknown opcode: 0x%02hhX - PC: 0x%04hX", op,
                state->registers.PC - 1);
-      next = 0;
+      cont = 0;
     }
+    next = 0;
   }
 
   // draw
@@ -503,26 +510,29 @@ void process(State *state) {
     DrawText(TextFormat("C: 0x%02hhX", state->registers.C), 10, 50, 20, WHITE);
     DrawText(TextFormat("D: 0x%02hhX", state->registers.D), 10, 70, 20, WHITE);
     DrawText(TextFormat("E: 0x%02hhX", state->registers.E), 10, 90, 20, WHITE);
-    DrawText(TextFormat("F: b" BYTE_TO_BINARY_PATTERN,
-                        BYTE_TO_BINARY(state->registers.F)),
-             10, 110, 20, WHITE);
+    DrawText(
+        TextFormat("F: 0x%02hhX b%hhb", state->registers.F, state->registers.F),
+        10, 110, 20, WHITE);
     DrawText(TextFormat("H: 0x%02hhX", state->registers.H), 10, 130, 20, WHITE);
     DrawText(TextFormat("L: 0x%02hhX", state->registers.L), 10, 150, 20, WHITE);
-    DrawText(TextFormat("AF: 0x%04hhX", state->registers.AF), 10, 170, 20,
+    DrawText(TextFormat("AF: 0x%04hX", state->registers.AF), 10, 170, 20,
              WHITE);
-    DrawText(TextFormat("BC: 0x%04hhX", state->registers.BC), 10, 190, 20,
+    DrawText(TextFormat("BC: 0x%04hX", state->registers.BC), 10, 190, 20,
              WHITE);
-    DrawText(TextFormat("DE: 0x%04hhX", state->registers.DE), 10, 210, 20,
+    DrawText(TextFormat("DE: 0x%04hX", state->registers.DE), 10, 210, 20,
              WHITE);
-    DrawText(TextFormat("HL: 0x%04hhX", state->registers.HL), 10, 230, 20,
+    DrawText(TextFormat("HL: 0x%04hX b%hb", state->registers.HL,
+                        state->registers.HL),
+             10, 230, 20, WHITE);
+    DrawText(TextFormat("SP: 0x%04hX", state->registers.SP), 10, 250, 20,
              WHITE);
-    DrawText(TextFormat("SP: 0x%04hhX", state->registers.SP), 10, 250, 20,
-             WHITE);
-    DrawText(TextFormat("PC: 0x%04hhX", state->registers.PC), 10, 270, 20,
-             WHITE);
+    DrawText(TextFormat("PC: 0x%04hX b%hb", state->registers.PC,
+                        state->registers.PC),
+             10, 270, 20, WHITE);
     DrawText(TextFormat("OP: 0x%02hhX",
                         read_byte_from_mmu(&state->mmu, state->registers.PC)),
              10, 290, 20, YELLOW);
+    DrawFPS(GetScreenWidth() - 100, GetScreenHeight() - 20);
   }
   EndDrawing();
 }

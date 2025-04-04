@@ -9,10 +9,10 @@ void initialize_registers(State *state) {
   registers.B = 0x00;
   registers.D = 0x00;
   registers.H = 0x00;
-  registers.F = 0x0000;
-  registers.C = 0x0000;
-  registers.E = 0x0000;
-  registers.L = 0x0000;
+  registers.F = 0x00;
+  registers.C = 0x00;
+  registers.E = 0x00;
+  registers.L = 0x00;
   registers.SP = 0x0000;
   registers.PC = 0x0000;
 
